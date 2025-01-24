@@ -8,9 +8,7 @@ jobs:
   ruby-audit:
     name: Ruby Dependency Vulnerability Check
     runs-on: ubuntu-latest
-    permissions:
-      contents: read   # Required to checkout the code
-
+    
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
