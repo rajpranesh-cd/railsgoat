@@ -55,16 +55,22 @@ jobs:
           echo "Installing bundler and bundler-audit..."
           gem install bundler bundler-audit --user-install || echo "Failed to install bundler or bundler-audit."
           echo "Adding user gem directory to PATH..."
-          echo 'export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH"' >> ~/.bashrc
-          source ~/.bashrc
+          GEM_PATH="$HOME/.local/share/gem/ruby/3.2.0/bin"
+          echo "GEM_PATH: $GEM_PATH"
+          echo "Current PATH: $PATH"
+          echo "Updated PATH: $GEM_PATH:$PATH"
+          echo "PATH=$GEM_PATH:$PATH" >> $GITHUB_ENV
           echo "Installed bundler and bundler-audit."
 
       # Step 4: Run Bundler Audit
       - name: Run Bundler Audit
         if: env.is_ruby == 'true'
         continue-on-error: true  # Prevent failure if bundler-audit fails
+        env:
+          PATH: ${{ env.PATH }}  # Use the updated PATH from the previous step
         run: |
           echo "Running bundler-audit..."
+          echo "Current PATH: $PATH"
           bundle install || echo "Failed to install dependencies."
           bundler-audit check --gemfile-lock Gemfile.lock --update > bundler_audit_report.txt || true
           echo "Contents of bundler_audit_report.txt:"
