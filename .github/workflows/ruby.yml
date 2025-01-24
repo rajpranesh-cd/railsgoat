@@ -28,16 +28,32 @@ jobs:
             echo "is_ruby=false" >> $GITHUB_ENV
           fi
 
-      # Step 2: Install Bundler and Bundler Audit
+      # Step 2: Set up rbenv and install Ruby
+      - name: Set up rbenv and Ruby
+        if: env.is_ruby == 'true'
+        run: |
+          echo "Installing rbenv and Ruby..."
+          sudo apt-get update
+          sudo apt-get install -y rbenv ruby-build
+          echo 'eval "$(rbenv init -)"' >> ~/.bashrc
+          source ~/.bashrc
+
+          # Install the desired Ruby version (e.g., 3.2.0)
+          rbenv install 3.2.0
+          rbenv global 3.2.0
+
+          echo "Ruby version:"
+          ruby --version
+
+      # Step 3: Install Bundler and Bundler Audit
       - name: Install Bundler and Bundler Audit
         if: env.is_ruby == 'true'
         run: |
           echo "Installing bundler and bundler-audit..."
-          gem install bundler bundler-audit --user-install
-          export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH"
+          gem install bundler bundler-audit
           echo "Installed bundler and bundler-audit."
 
-      # Step 3: Run Bundler Audit
+      # Step 4: Run Bundler Audit
       - name: Run Bundler Audit
         if: env.is_ruby == 'true'
         run: |
@@ -47,7 +63,7 @@ jobs:
           echo "Contents of bundler_audit_report.txt:"
           cat bundler_audit_report.txt
 
-      # Step 4: Extract GHSA IDs from Bundler Audit Report
+      # Step 5: Extract GHSA IDs from Bundler Audit Report
       - name: Extract GHSA IDs from Bundler Audit Report
         if: env.is_ruby == 'true'
         run: |
