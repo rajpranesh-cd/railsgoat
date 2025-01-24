@@ -1,0 +1,69 @@
+name: Ruby Dependency Vulnerability Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  ruby-audit:
+    name: Ruby Dependency Vulnerability Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read   # Required to checkout the code
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # #Step 1: Check for Ruby project (Gemfile)
+      - name: Check for Ruby project
+        id: ruby_detected
+        run: |
+          if [ -f "Gemfile" ]; then
+            echo "Ruby project detected."
+            echo "is_ruby=true" >> $GITHUB_ENV
+          else
+            echo "No Ruby project found."
+            echo "is_ruby=false" >> $GITHUB_ENV
+          fi
+
+      # Step 2: Install Bundler and Bundler Audit
+      - name: Install Bundler and Bundler Audit
+        if: env.is_ruby == 'true'
+        run: |
+          echo "Installing bundler and bundler-audit..."
+          gem install bundler bundler-audit --user-install
+          export PATH="$HOME/.local/share/gem/ruby/3.2.0/bin:$PATH"
+          echo "Installed bundler and bundler-audit."
+
+      # Step 3: Run Bundler Audit
+      - name: Run Bundler Audit
+        if: env.is_ruby == 'true'
+        run: |
+          echo "Running bundler-audit..."
+          bundle install
+          bundler-audit check --gemfile-lock Gemfile.lock --update > bundler_audit_report.txt || true
+          echo "Contents of bundler_audit_report.txt:"
+          cat bundler_audit_report.txt
+
+      # Step 4: Extract GHSA IDs from Bundler Audit Report
+      - name: Extract GHSA IDs from Bundler Audit Report
+        if: env.is_ruby == 'true'
+        run: |
+          echo "Extracting GHSA IDs from bundler_audit_report.txt..."
+          grep -oP 'GHSA-\w{4}-\w{4}-\w{4}' bundler_audit_report.txt > extracted_ghsa_ids.txt
+          echo "Extracted GHSA IDs:"
+          cat extracted_ghsa_ids.txt
+
+      # Step 5: Fetch known vulnerabilities list from S3
+      - name: Fetch known vulnerabilities from S3
+        if: env.is_ruby == 'true'
+        env:
+          S3_BUCKET: josys-compliance-documents
+          FILE_KEY: josys_known_ve_list.json
+        run: |
+          echo "Fetching known vulnerabilities list from S3..."
+          aws s3 cp s3://$S3_BUCKET/$FILE_KEY  .
+          echo "Known vulnerabilities list downloaded from S3."
+
+     
