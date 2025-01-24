@@ -15,7 +15,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Step 1: Check for Ruby project (Gemfile)
+      # #Step 1: Check for Ruby project (Gemfile)
       - name: Check for Ruby project
         id: ruby_detected
         run: |
