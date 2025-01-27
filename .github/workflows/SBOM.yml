@@ -19,7 +19,7 @@ jobs:
       with:
         format: spdx-json
         output-file: sbom.spdx.json
-        image: "dir:."  # CORRECTED: Changed from "sbom:." to "dir:."
+        image: "dir:."  
         args: --quiet  # Add quiet mode to suppress unnecessary output
 
     - name: Clean up auto-generated files
