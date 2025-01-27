@@ -13,7 +13,7 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: anchore/sbom-action@v0
 
     - name: Generate SBOM using Syft (for project dependencies)
       uses: anchore/sbom-action@v0.14.0
