@@ -19,12 +19,13 @@ jobs:
       with:
         format: spdx-json
         output-file: sbom.spdx.json
-        image: "dir:."  
-        args: --quiet  # Add quiet mode to suppress unnecessary output
+        image: "dir:."  # Proper directory scan syntax
+        syft-version: "v1.21.0"  # Explicitly specify newer Syft version
+        path: "."  # Explicit scan target
 
     - name: Clean up auto-generated files
       run: |
-        # Remove any unexpected files created by Syft
+        # Remove Syft's default output files
         rm -f dir__.spdx.json
         rm -f *-generate-sbom.spdx.json
 
