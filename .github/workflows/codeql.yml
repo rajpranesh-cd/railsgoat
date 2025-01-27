@@ -1,20 +1,53 @@
-name: CodeQL Security Scan
+name: CodeQL Security Scan (Language-Aware)
 
 on:
   push:
-    branches: ["*"]  # All branches
+    branches: ["*"]
   pull_request:
-    branches: ["*"]  # All PRs
+    branches: ["*"]
 
 jobs:
+  detect-languages:
+    name: Detect Languages
+    runs-on: ubuntu-latest
+    outputs:
+      languages: ${{ steps.detect.outputs.languages }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Detect repository languages
+      id: detect
+      run: |
+        # Install github-linguist for language detection
+        sudo apt-get install -y gem && sudo gem install github-linguist
+
+        # Get languages (output: javascript,python,etc.)
+        langs=$(github-linguist --breakdown | grep -E '^[0-9.]+%' | awk '{print $2}' | tr '\n' ',' | sed 's/,$//')
+
+        # Map to CodeQL-supported languages
+        codeql_langs=$(echo "$langs" | sed -e 's/typescript/javascript/g' -e 's/terraform/hcl/g' -e 's/bash/shell/g')
+
+        # Filter for only CodeQL-supported languages
+        supported_langs="javascript python hcl shell ruby"
+        filtered_langs=""
+        for lang in $(echo "$codeql_langs" | tr ',' ' '); do
+          if [[ " $supported_langs " == *" $lang "* ]]; then
+            filtered_langs+="$lang,"
+          fi
+        done
+
+        # Output cleaned list
+        echo "languages=${filtered_langs%,}" >> $GITHUB_OUTPUT
+
   codeql-analysis:
     name: CodeQL Analysis
+    needs: detect-languages
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        language: ['javascript', 'python', 'hcl', 'shell', 'ruby']
-
+        language: ${{ fromJson(needs.detect-languages.outputs.languages) }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -23,18 +56,14 @@ jobs:
       uses: github/codeql-action/init@v2
       with:
         languages: ${{ matrix.language }}
-        queries: security-extended,security-and-quality  # Enhanced checks
-
-    # Optional: Only needed for compiled languages (e.g., Ruby may need it for advanced analysis)
-    - name: Autobuild (if needed)
-      uses: github/codeql-action/autobuild@v2
+        queries: security-extended,security-and-quality
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2
       with:
-        output: ./codeql-results  # Directory to store SARIF reports
+        output: ./codeql-results
 
-    - name: Upload SARIF Report as Artifact
+    - name: Upload SARIF Report
       uses: actions/upload-artifact@v3
       with:
         name: codeql-report-${{ matrix.language }}
