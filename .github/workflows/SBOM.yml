@@ -20,10 +20,8 @@ jobs:
       with:
         format: spdx-json
         output-file: sbom.spdx.json
-        image: "dir:."
+        #image: "dir:."
 
-    - name: Remove unwanted SBOM file
-      run: rm -f dir__.spdx.json  # Delete the unwanted file
 
     - name: Upload SBOM as artifact
       uses: actions/upload-artifact@v3
