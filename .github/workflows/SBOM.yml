@@ -3,9 +3,6 @@ name: Generate SBOM for Dependencies
 on:
   push:
     branches: ["*"]
-  pull_request:
-    branches: [main]
-
 jobs:
   generate-sbom:
     runs-on: ubuntu-22.04
@@ -19,15 +16,7 @@ jobs:
       with:
         format: spdx-json
         output-file: sbom.spdx.json
-        image: "dir:."  # Proper directory scan syntax
-        syft-version: "v1.21.0"  # Explicitly specify newer Syft version
-        path: "."  # Explicit scan target
-
-    - name: Clean up auto-generated files
-      run: |
-        # Remove Syft's default output files
-        rm -f dir__.spdx.json
-        rm -f *-generate-sbom.spdx.json
+        image: "dir:." 
 
     - name: Upload SBOM artifact (v4)
       uses: actions/upload-artifact@v4
