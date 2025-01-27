@@ -2,26 +2,36 @@ name: Semgrep Security Scan
 
 on:
   push:
-    branches: [ '*' ]
+    branches: [ "*" ]
+  pull_request:
+    branches: [ "master" ]
+  schedule:
+    - cron: '22 1 * * 5'
+
+permissions:
+  contents: read
 
 jobs:
-  semgrep-scan:
-    name: Semgrep Security Scan
+  semgrep:
+    permissions:
+      contents: read
+      security-events: write
+    name: Semgrep Scan
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Semgrep Scan
-        uses: returntocorp/semgrep-action@v2
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@fcd5ab7459e8d91cb1777481980d1b18b4fc6735
         with:
-          config: p/ci
-          output: semgrep-results.sarif
-          args: --sarif --metrics=off --error
-        env:
-          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+          config: "p/ci"  # Required security rules
+          publishToken: ${{ secrets.SEMGREP_APP_TOKEN }}
+          generateSarif: "1"
+          args: --error  # Fail the build if findings are found
 
-      - name: Upload SARIF Report
-        uses: github/codeql-action/upload-sarif@v2
+      - name: Upload SARIF results
+        uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: semgrep-results.sarif
+          sarif_file: semgrep.sarif
+        if: always()
