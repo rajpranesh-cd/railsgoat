@@ -2,14 +2,13 @@ name: Generate SBOM for Dependencies
 
 on:
   push:
-    branches:
-      - "*"
+    branches: ["*"]
   pull_request:
     branches: [main]
 
 jobs:
   generate-sbom:
-    runs-on: ubuntu-22.04  # Explicitly use current LTS to avoid future ubuntu-24.04 warnings
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Checkout code
@@ -20,10 +19,17 @@ jobs:
       with:
         format: spdx-json
         output-file: sbom.spdx.json
-        image: "sbom:."
-        
+        image: "dir:."  # CORRECTED: Changed from "sbom:." to "dir:."
+        args: --quiet  # Add quiet mode to suppress unnecessary output
+
+    - name: Clean up auto-generated files
+      run: |
+        # Remove any unexpected files created by Syft
+        rm -f dir__.spdx.json
+        rm -f *-generate-sbom.spdx.json
+
     - name: Upload SBOM artifact (v4)
-      uses: actions/upload-artifact@v4  # Updated to v4 to avoid deprecation
+      uses: actions/upload-artifact@v4
       with:
         name: sbom-dependencies
         path: sbom.spdx.json
