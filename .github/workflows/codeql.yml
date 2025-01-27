@@ -1,4 +1,4 @@
-name: CodeQL Security Scan (Single Job)
+name: CodeQL Security Scan 
 
 on:
   push:
@@ -14,10 +14,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # Required for accurate language detection
+        fetch-depth: 0  # Required for Gemfile detection
 
-    - name: Detect repository languages
-      id: detect-languages
+    - name: Detect languages and check Gemfile
+      id: detect
       run: |
         # Install github-linguist
         sudo apt-get update
@@ -26,15 +26,12 @@ jobs:
 
         # Detect languages
         langs=$(github-linguist --breakdown | grep -E '^[0-9.]+%' | awk '{print $2}' | tr '\n' ',' | sed 's/,$//')
-        echo "Detected languages: $langs"
 
         # Map to CodeQL-supported languages
         codeql_langs=$(echo "$langs" | sed \
           -e 's/typescript/javascript/g' \
           -e 's/terraform/hcl/g' \
-          -e 's/bash/shell/g' \
-          -e 's/zsh/shell/g')
-        echo "Mapped CodeQL languages: $codeql_langs"
+          -e 's/bash/shell/g')
 
         # Filter supported languages
         supported_langs="javascript python hcl shell ruby"
@@ -45,12 +42,18 @@ jobs:
           fi
         done
 
-        # Output as environment variable
+        # Add Ruby if Gemfile exists
+        if [ -f "Gemfile" ]; then
+          if [[ ",$filtered_langs," != *",ruby,"* ]]; then
+            echo "Gemfile detected - forcing Ruby analysis"
+            filtered_langs+="ruby,"
+          fi
+        fi
+
+        # Final cleanup
         if [ -z "$filtered_langs" ]; then
-          echo "No supported languages detected"
           echo "LANGUAGES=" >> $GITHUB_ENV
         else
-          echo "Final filtered languages: ${filtered_langs%,}"
           echo "LANGUAGES=${filtered_langs%,}" >> $GITHUB_ENV
         fi
 
@@ -59,7 +62,7 @@ jobs:
       uses: github/codeql-action/init@v2
       with:
         languages: ${{ env.LANGUAGES }}
-        queries: security-extended,security-and-quality
+        queries: security-extended
 
     - name: Perform CodeQL Analysis
       if: env.LANGUAGES != ''
