@@ -19,30 +19,37 @@ jobs:
     - name: Detect repository languages
       id: detect
       run: |
-        # Install github-linguist for language detection
-        sudo apt-get install -y gem && sudo gem install github-linguist
+        # Install github-linguist
+        sudo apt-get update
+        sudo apt-get install -y ruby-dev pkg-config
+        sudo gem install github-linguist
 
-        # Get languages (output: javascript,python,etc.)
+        # Detect languages and map to CodeQL-supported ones
         langs=$(github-linguist --breakdown | grep -E '^[0-9.]+%' | awk '{print $2}' | tr '\n' ',' | sed 's/,$//')
 
-        # Map to CodeQL-supported languages
+        # Map aliases (TypeScript → JS, Terraform → HCL, etc.)
         codeql_langs=$(echo "$langs" | sed -e 's/typescript/javascript/g' -e 's/terraform/hcl/g' -e 's/bash/shell/g')
 
-        # Filter for only CodeQL-supported languages
+        # Filter for CodeQL-supported languages
         supported_langs="javascript python hcl shell ruby"
         filtered_langs=""
         for lang in $(echo "$codeql_langs" | tr ',' ' '); do
           if [[ " $supported_langs " == *" $lang "* ]]; then
-            filtered_langs+="$lang,"
+            filtered_langs+="\"$lang\","
           fi
         done
 
-        # Output cleaned list
-        echo "languages=${filtered_langs%,}" >> $GITHUB_OUTPUT
+        # Ensure valid JSON array (even if empty)
+        if [ -z "$filtered_langs" ]; then
+          echo "languages=[]" >> $GITHUB_OUTPUT
+        else
+          echo "languages=[${filtered_langs%,}]" >> $GITHUB_OUTPUT
+        fi
 
   codeql-analysis:
     name: CodeQL Analysis
     needs: detect-languages
+    if: ${{ needs.detect-languages.outputs.languages != '[]' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
