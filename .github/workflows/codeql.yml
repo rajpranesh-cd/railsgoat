@@ -1,0 +1,41 @@
+name: CodeQL Security Scan
+
+on:
+  push:
+    branches: ["*"]  # All branches
+  pull_request:
+    branches: ["*"]  # All PRs
+
+jobs:
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript', 'python', 'hcl', 'shell', 'ruby']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: ${{ matrix.language }}
+        queries: security-extended,security-and-quality  # Enhanced checks
+
+    # Optional: Only needed for compiled languages (e.g., Ruby may need it for advanced analysis)
+    - name: Autobuild (if needed)
+      uses: github/codeql-action/autobuild@v2
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        output: ./codeql-results  # Directory to store SARIF reports
+
+    - name: Upload SARIF Report as Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: codeql-report-${{ matrix.language }}
+        path: ./codeql-results/codeql-${{ matrix.language }}.sarif
