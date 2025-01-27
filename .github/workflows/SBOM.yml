@@ -13,10 +13,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: anchore/sbom-action@v0
+      uses: actions/checkout@v4
 
     - name: Generate SBOM using Syft (for project dependencies)
-      uses: anchore/sbom-action@v0.14.0
+      uses: anchore/sbom-action@v0
       with:
         # Scan the current directory (source code) for dependencies
         # Syft automatically detects package managers (npm, pip, Go, etc.)
