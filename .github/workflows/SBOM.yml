@@ -20,16 +20,4 @@ jobs:
       with:
         format: spdx-json
         output-file: sbom.spdx.json
-        image: "dir:."
-
-    - name: Clean up unwanted files
-      run: |
-        # Remove auto-generated files from Syft action
-        rm -f dir__.spdx.json
-        rm -f railsgoat-generate-sbom.spdx.json  # Add your specific unwanted file
-
-    - name: Upload SBOM artifact (v4)
-      uses: actions/upload-artifact@v4  # Updated to v4 to avoid deprecation
-      with:
-        name: sbom-dependencies
-        path: sbom.spdx.json
+        image: "sbom-dependencies:."
