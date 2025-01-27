@@ -9,22 +9,27 @@ on:
 
 jobs:
   generate-sbom:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # Explicitly use current LTS to avoid future ubuntu-24.04 warnings
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Generate SBOM using Syft (for project dependencies)
+    - name: Generate SBOM using Syft
       uses: anchore/sbom-action@v0
       with:
         format: spdx-json
         output-file: sbom.spdx.json
-        #image: "dir:."
+        image: "dir:."
 
+    - name: Clean up unwanted files
+      run: |
+        # Remove auto-generated files from Syft action
+        rm -f dir__.spdx.json
+        rm -f railsgoat-generate-sbom.spdx.json  # Add your specific unwanted file
 
-    - name: Upload SBOM as artifact
-      uses: actions/upload-artifact@v3
+    - name: Upload SBOM artifact (v4)
+      uses: actions/upload-artifact@v4  # Updated to v4 to avoid deprecation
       with:
         name: sbom-dependencies
         path: sbom.spdx.json
