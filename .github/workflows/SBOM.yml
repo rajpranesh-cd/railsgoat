@@ -20,4 +20,10 @@ jobs:
       with:
         format: spdx-json
         output-file: sbom.spdx.json
-        image: "sbom-dependencies:."
+        image: "sbom:."
+        
+    - name: Upload SBOM artifact (v4)
+      uses: actions/upload-artifact@v4  # Updated to v4 to avoid deprecation
+      with:
+        name: sbom-dependencies
+        path: sbom.spdx.json
