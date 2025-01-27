@@ -3,7 +3,7 @@ name: Generate SBOM for Dependencies
 on:
   push:
     branches:
-    - "*"
+      - "*"
   pull_request:
     branches: [main]
 
@@ -18,12 +18,12 @@ jobs:
     - name: Generate SBOM using Syft (for project dependencies)
       uses: anchore/sbom-action@v0
       with:
-        # Scan the current directory (source code) for dependencies
-        # Syft automatically detects package managers (npm, pip, Go, etc.)
         format: spdx-json
         output-file: sbom.spdx.json
-        # Target the repository directory instead of a container image
         image: "dir:."
+
+    - name: Remove unwanted SBOM file
+      run: rm -f dir__.spdx.json  # Delete the unwanted file
 
     - name: Upload SBOM as artifact
       uses: actions/upload-artifact@v3
