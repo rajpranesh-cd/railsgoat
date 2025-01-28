@@ -1,15 +1,9 @@
 name: Semgrep
 
 on:
-  pull_request: {}
   push:
     branches:
       - "*"
-    paths:
-      - .github/workflows/semgrep.yml
-  schedule:
-    - cron: '0 0 * * 0'
-  workflow_dispatch: {}
 
 jobs:
   semgrep:
@@ -124,7 +118,7 @@ jobs:
                       issue_details.string = f"File: {detail['file']} (Line: {detail['line']})"
                       issue_div.append(issue_details)
 
-                      if detail["snippet"]:
+                      if detail["snippet"] != "N/A":
                           snippet = html.new_tag('pre', attrs={'class': 'snippet'})
                           snippet.string = detail["snippet"]
                           issue_div.append(snippet)
