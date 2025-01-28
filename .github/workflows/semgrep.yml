@@ -1,4 +1,5 @@
 name: Semgrep
+
 on:
   pull_request: {}
   push:
@@ -9,32 +10,38 @@ on:
   schedule:
     - cron: '0 0 * * 0'
   workflow_dispatch: {}
+
 jobs:
   semgrep:
-    name: Scan
+    name: Semgrep Scan and Report Generation
     runs-on: ubuntu-latest
     container:
       image: returntocorp/semgrep
     env:
       SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
     steps:
-      - uses: actions/checkout@v3
+      # Step 1: Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Semgrep scan
+      # Step 2: Run Semgrep scan
+      - name: Run Semgrep scan
         id: scan
-        continue-on-error: true  # Continue even if findings exist
+        continue-on-error: true
         run: semgrep ci --config=auto --sarif -o result.sarif
 
-      - name: Set up Python virtual environment
+      # Step 3: Set up Python virtual environment
+      - name: Set up Python environment
         run: |
           python3 -m venv /opt/venv
           source /opt/venv/bin/activate
           pip install beautifulsoup4
 
-      - name: Generate reports
+      # Step 4: Generate HTML and CSV Reports with Python Script
+      - name: Generate Reports
         run: |
           source /opt/venv/bin/activate
-          cat << 'EOF' > generate_reports.py
+          python3 - <<'EOF'
           import json
           import csv
           from bs4 import BeautifulSoup
@@ -72,23 +79,29 @@ jobs:
                   csv_writer.writerow(["Rule ID", "Message", "File", "Line", "Snippet"])
                   for rule_id, details in results_by_rule.items():
                       for detail in details:
-                          csv_writer.writerow([
-                              rule_id,
-                              detail["message"],
-                              detail["file"],
-                              detail["line"],
-                              detail["snippet"]
-                          ])
+                          csv_writer.writerow([rule_id, detail["message"], detail["file"], detail["line"], detail["snippet"]])
 
               html = BeautifulSoup("<html><head><title>SARIF Report</title></head><body></body></html>", 'html.parser')
-              style = '''
+              style = """
               <style>
-                  /* Your CSS styles here */
+                  body { font-family: 'Segoe UI', sans-serif; background: #f9f9f9; color: #333; }
+                  .container { margin: 20px; padding: 20px; background: #fff; border-radius: 5px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
+                  h1 { font-size: 20px; color: #444; }
+                  .rule-group { margin-bottom: 20px; }
+                  .rule-header { background: #f1f1f1; padding: 10px; font-size: 16px; font-weight: bold; cursor: pointer; border: 1px solid #ddd; }
+                  .rule-details { padding: 10px; display: none; border: 1px solid #ddd; border-top: none; }
+                  .issue-row { margin-bottom: 15px; }
+                  .issue-header { color: #d9534f; font-weight: bold; }
+                  .file-info { color: #0056b3; margin-top: 5px; }
+                  .snippet { background: #f8f9fa; border: 1px solid #ddd; padding: 8px; font-family: monospace; font-size: 13px; border-radius: 3px; }
               </style>
               <script>
-                  /* Your JavaScript here */
+                  function toggleDetails(id) {
+                      var element = document.getElementById(id);
+                      element.style.display = element.style.display === 'none' ? 'block' : 'none';
+                  }
               </script>
-              '''
+              """
               html.head.append(BeautifulSoup(style, 'html.parser'))
               container = html.new_tag('div', attrs={'class': 'container'})
               html.body.append(container)
@@ -107,7 +120,7 @@ jobs:
                       issue_div.append(html.new_tag('div', attrs={'class': 'issue-header'}))
                       issue_div.div.string = detail["message"]
 
-                      issue_details = html.new_tag('div', attrs={'class': 'issue-details'})
+                      issue_details = html.new_tag('div', attrs={'class': 'file-info'})
                       issue_details.string = f"File: {detail['file']} (Line: {detail['line']})"
                       issue_div.append(issue_details)
 
@@ -125,11 +138,10 @@ jobs:
 
           generate_sarif_html_and_csv("result.sarif", "report.html", "report.csv")
           EOF
-          
-          python3 generate_reports.py
 
-      - name: Upload results
-        if: always()  # Always upload regardless of previous failures
+      # Step 5: Upload Artifacts
+      - name: Upload Reports
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: semgrep-results
@@ -138,6 +150,7 @@ jobs:
             report.html
             report.csv
 
-      - name: Fail if issues found
+      # Step 6: Fail if Issues Found
+      - name: Fail if vulnerabilities found
         if: steps.scan.outcome == 'failure'
         run: exit 1
