@@ -13,6 +13,8 @@ jobs:
   semgrep:
     name: Scan
     runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep
     env:
       SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
     steps:
@@ -20,17 +22,13 @@ jobs:
 
       - name: Semgrep scan
         id: scan
-        continue-on-error: true  # Continue to generate reports even if issues found
+        continue-on-error: true  # Continue even if findings exist
         run: semgrep ci --config=auto --sarif -o result.sarif
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install dependencies
+      - name: Set up Python inside the container
         run: |
-          pip install beautifulsoup4
+          apk add --no-cache python3 py3-pip
+          pip3 install beautifulsoup4
 
       - name: Generate reports
         run: |
@@ -39,14 +37,97 @@ jobs:
           import csv
           from bs4 import BeautifulSoup
 
-          # (Keep your full Python script here)
+          def generate_sarif_html_and_csv(sarif_file_path, html_file_path, csv_file_path):
+              with open(sarif_file_path, 'r') as sarif_file:
+                  sarif_data = json.load(sarif_file)
+              
+              runs = sarif_data.get("runs", [])
+              results_by_rule = {}
+
+              for run in runs:
+                  results = run.get("results", [])
+                  for result in results:
+                      rule_id = result.get("ruleId", "Uncategorized")
+                      message = result.get("message", {}).get("text", "N/A")
+                      locations = result.get("locations", [])
+
+                      for location in locations:
+                          uri = location.get("physicalLocation", {}).get("artifactLocation", {}).get("uri", "N/A")
+                          start_line = location.get("physicalLocation", {}).get("region", {}).get("startLine", "N/A")
+                          snippet = location.get("physicalLocation", {}).get("region", {}).get("snippet", {}).get("text", "N/A")
+                          
+                          if rule_id not in results_by_rule:
+                              results_by_rule[rule_id] = []
+                          results_by_rule[rule_id].append({
+                              "message": message,
+                              "file": uri,
+                              "line": start_line,
+                              "snippet": snippet
+                          })
+              
+              with open(csv_file_path, 'w', newline='', encoding='utf-8') as csv_file:
+                  csv_writer = csv.writer(csv_file)
+                  csv_writer.writerow(["Rule ID", "Message", "File", "Line", "Snippet"])
+                  for rule_id, details in results_by_rule.items():
+                      for detail in details:
+                          csv_writer.writerow([
+                              rule_id,
+                              detail["message"],
+                              detail["file"],
+                              detail["line"],
+                              detail["snippet"]
+                          ])
+
+              html = BeautifulSoup("<html><head><title>SARIF Report</title></head><body></body></html>", 'html.parser')
+              style = '''
+              <style>
+                  /* Your CSS styles here */
+              </style>
+              <script>
+                  /* Your JavaScript here */
+              </script>
+              '''
+              html.head.append(BeautifulSoup(style, 'html.parser'))
+              container = html.new_tag('div', attrs={'class': 'container'})
+              html.body.append(container)
+              container.append(html.new_tag('h1'))
+              container.h1.string = "SARIF Report"
+
+              for rule_id, details in results_by_rule.items():
+                  group_div = html.new_tag('div', attrs={'class': 'rule-group'})
+                  header_div = html.new_tag('div', attrs={'class': 'rule-header', 'onclick': f'toggleDetails("{rule_id}")'})
+                  header_div.string = f"{rule_id} ({len(details)} issues)"
+                  group_div.append(header_div)
+
+                  details_div = html.new_tag('div', attrs={'class': 'rule-details', 'id': rule_id})
+                  for detail in details:
+                      issue_div = html.new_tag('div', attrs={'class': 'issue-row'})
+                      issue_div.append(html.new_tag('div', attrs={'class': 'issue-header'}))
+                      issue_div.div.string = detail["message"]
+
+                      issue_details = html.new_tag('div', attrs={'class': 'issue-details'})
+                      issue_details.string = f"File: {detail['file']} (Line: {detail['line']})"
+                      issue_div.append(issue_details)
+
+                      if detail["snippet"]:
+                          snippet = html.new_tag('pre', attrs={'class': 'snippet'})
+                          snippet.string = detail["snippet"]
+                          issue_div.append(snippet)
+
+                      details_div.append(issue_div)
+                  group_div.append(details_div)
+                  container.append(group_div)
+
+              with open(html_file_path, 'w', encoding='utf-8') as html_file:
+                  html_file.write(str(html))
 
           generate_sarif_html_and_csv("result.sarif", "report.html", "report.csv")
           EOF
-          python generate_reports.py
+          
+          python3 generate_reports.py
 
       - name: Upload results
-        if: always()
+        if: always()  # Always upload regardless of previous failures
         uses: actions/upload-artifact@v3
         with:
           name: semgrep-results
