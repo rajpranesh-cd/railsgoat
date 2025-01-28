@@ -22,7 +22,7 @@ jobs:
       - name: Run Semgrep scan
         id: scan
         continue-on-error: true
-        run: semgrep ci --sarif --sarif-output=result.sarif
+        run: semgrep scan --config=auto --sarif --sarif-output=result.sarif
       # Step 3: Set up Python virtual environment
       - name: Set up Python environment
         run: |
