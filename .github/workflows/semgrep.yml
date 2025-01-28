@@ -27,187 +27,107 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'  # Specify the Python version you want to use
+          python-version: '3.9'
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
           pip install beautifulsoup4
 
-      - name: Generate HTML and CSV reports
+      - name: Generate reports
         run: |
-          python -c "
-import json
-import csv
-from bs4 import BeautifulSoup
+          cat << 'EOF' > generate_reports.py
+          import json
+          import csv
+          from bs4 import BeautifulSoup
 
-def generate_sarif_html_and_csv(sarif_file_path, html_file_path, csv_file_path):
-    # Load the SARIF file
-    with open(sarif_file_path, 'r') as sarif_file:
-        sarif_data = json.load(sarif_file)
-    
-    # Extract runs and results
-    runs = sarif_data.get('runs', [])
-    results_by_rule = {}
+          def generate_sarif_html_and_csv(sarif_file_path, html_file_path, csv_file_path):
+              with open(sarif_file_path, 'r') as sarif_file:
+                  sarif_data = json.load(sarif_file)
+              
+              runs = sarif_data.get("runs", [])
+              results_by_rule = {}
 
-    for run in runs:
-        results = run.get('results', [])
-        for result in results:
-            rule_id = result.get('ruleId', 'Uncategorized')
-            message = result.get('message', {}).get('text', 'N/A')
-            locations = result.get('locations', [])
+              for run in runs:
+                  results = run.get("results", [])
+                  for result in results:
+                      rule_id = result.get("ruleId", "Uncategorized")
+                      message = result.get("message", {}).get("text", "N/A")
+                      locations = result.get("locations", [])
 
-            for location in locations:
-                uri = location.get('physicalLocation', {}).get('artifactLocation', {}).get('uri', 'N/A')
-                start_line = location.get('physicalLocation', {}).get('region', {}).get('startLine', 'N/A')
-                snippet = location.get('physicalLocation', {}).get('region', {}).get('snippet', {}).get('text', 'N/A')
-                
-                if rule_id not in results_by_rule:
-                    results_by_rule[rule_id] = []
-                results_by_rule[rule_id].append({
-                    'message': message,
-                    'file': uri,
-                    'line': start_line,
-                    'snippet': snippet
-                })
-    
-    # Generate the CSV report
-    with open(csv_file_path, 'w', newline='', encoding='utf-8') as csv_file:
-        csv_writer = csv.writer(csv_file)
-        csv_writer.writerow(['Rule ID', 'Message', 'File', 'Line', 'Snippet'])
-        for rule_id, details in results_by_rule.items():
-            for detail in details:
-                csv_writer.writerow([
-                    rule_id,
-                    detail['message'],
-                    detail['file'],
-                    detail['line'],
-                    detail['snippet']
-                ])
+                      for location in locations:
+                          uri = location.get("physicalLocation", {}).get("artifactLocation", {}).get("uri", "N/A")
+                          start_line = location.get("physicalLocation", {}).get("region", {}).get("startLine", "N/A")
+                          snippet = location.get("physicalLocation", {}).get("region", {}).get("snippet", {}).get("text", "N/A")
+                          
+                          if rule_id not in results_by_rule:
+                              results_by_rule[rule_id] = []
+                          results_by_rule[rule_id].append({
+                              "message": message,
+                              "file": uri,
+                              "line": start_line,
+                              "snippet": snippet
+                          })
+              
+              with open(csv_file_path, 'w', newline='', encoding='utf-8') as csv_file:
+                  csv_writer = csv.writer(csv_file)
+                  csv_writer.writerow(["Rule ID", "Message", "File", "Line", "Snippet"])
+                  for rule_id, details in results_by_rule.items():
+                      for detail in details:
+                          csv_writer.writerow([
+                              rule_id,
+                              detail["message"],
+                              detail["file"],
+                              detail["line"],
+                              detail["snippet"]
+                          ])
 
-    # Generate the HTML report
-    html = BeautifulSoup('<html><head><title>SARIF Viewer Report</title></head><body></body></html>', 'html.parser')
-    style = '''
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f8f9fa;
-            color: #333;
-            margin: 0;
-            padding: 0;
-        }
-        .container {
-            margin: 20px;
-            padding: 20px;
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            text-align: left;
-            font-size: 20px;
-            color: #333;
-        }
-        .rule-group {
-            margin-bottom: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        .rule-header {
-            padding: 10px 15px;
-            font-size: 16px;
-            font-weight: bold;
-            background-color: #f1f1f1;
-            color: #333;
-            cursor: pointer;
-            border-bottom: 1px solid #ddd;
-        }
-        .rule-header:hover {
-            background-color: #e2e6ea;
-        }
-        .rule-details {
-            display: none;
-            padding: 10px 15px;
-        }
-        .issue-row {
-            margin-bottom: 10px;
-        }
-        .issue-header {
-            font-size: 14px;
-            font-weight: bold;
-            color: #d9534f;
-        }
-        .issue-details {
-            margin: 5px 0;
-            font-size: 13px;
-        }
-        .file-info {
-            color: #007bff;
-        }
-        .snippet {
-            display: block;
-            background-color: #f8f9fa;
-            border: 1px solid #ddd;
-            padding: 8px;
-            font-family: monospace;
-            font-size: 13px;
-            border-radius: 5px;
-            margin-top: 5px;
-        }
-    </style>
-    <script>
-        function toggleDetails(id) {
-            var element = document.getElementById(id);
-            if (element.style.display === 'none' || element.style.display === '') {
-                element.style.display = 'block';
-            } else {
-                element.style.display = 'none';
-            }
-        }
-    </script>
-    '''
-    html.head.append(BeautifulSoup(style, 'html.parser'))
-    html.body.append(html.new_tag('div', attrs={'class': 'container'}))
+              html = BeautifulSoup("<html><head><title>SARIF Report</title></head><body></body></html>", 'html.parser')
+              style = '''
+              <style>
+                  /* Your CSS styles here */
+              </style>
+              <script>
+                  /* Your JavaScript here */
+              </script>
+              '''
+              html.head.append(BeautifulSoup(style, 'html.parser'))
+              container = html.new_tag('div', attrs={'class': 'container'})
+              html.body.append(container)
+              container.append(html.new_tag('h1'))
+              container.h1.string = "SARIF Report"
 
-    container = html.body.div
-    container.append(html.new_tag('h1'))
-    container.h1.string = 'SARIF Viewer Report'
+              for rule_id, details in results_by_rule.items():
+                  group_div = html.new_tag('div', attrs={'class': 'rule-group'})
+                  header_div = html.new_tag('div', attrs={'class': 'rule-header', 'onclick': f'toggleDetails("{rule_id}")'})
+                  header_div.string = f"{rule_id} ({len(details)} issues)"
+                  group_div.append(header_div)
 
-    # Add rule groups
-    for rule_id, details in results_by_rule.items():
-        group_div = html.new_tag('div', attrs={'class': 'rule-group'})
-        header_div = html.new_tag('div', attrs={'class': 'rule-header', 'onclick': f'toggleDetails("{rule_id}")'})
-        header_div.string = f'{rule_id} ({len(details)} issues)'
-        group_div.append(header_div)
+                  details_div = html.new_tag('div', attrs={'class': 'rule-details', 'id': rule_id})
+                  for detail in details:
+                      issue_div = html.new_tag('div', attrs={'class': 'issue-row'})
+                      issue_div.append(html.new_tag('div', attrs={'class': 'issue-header'}))
+                      issue_div.div.string = detail["message"]
 
-        details_div = html.new_tag('div', attrs={'class': 'rule-details', 'id': rule_id})
-        for detail in details:
-            issue_div = html.new_tag('div', attrs={'class': 'issue-row'})
-            issue_div.append(html.new_tag('div', attrs={'class': 'issue-header'}))
-            issue_div.div.string = detail['message']
+                      issue_details = html.new_tag('div', attrs={'class': 'issue-details'})
+                      issue_details.string = f"File: {detail['file']} (Line: {detail['line']})"
+                      issue_div.append(issue_details)
 
-            issue_details_div = html.new_tag('div', attrs={'class': 'issue-details'})
-            file_info = f'File: {detail["file"]} (Line: {detail["line"]})'
-            issue_details_div.string = file_info
-            issue_div.append(issue_details_div)
+                      if detail["snippet"]:
+                          snippet = html.new_tag('pre', attrs={'class': 'snippet'})
+                          snippet.string = detail["snippet"]
+                          issue_div.append(snippet)
 
-            if detail['snippet']:
-                snippet_div = html.new_tag('span', attrs={'class': 'snippet'})
-                snippet_div.string = detail['snippet']
-                issue_div.append(snippet_div)
+                      details_div.append(issue_div)
+                  group_div.append(details_div)
+                  container.append(group_div)
 
-            details_div.append(issue_div)
+              with open(html_file_path, 'w', encoding='utf-8') as html_file:
+                  html_file.write(str(html))
 
-        group_div.append(details_div)
-        container.append(group_div)
-    
-    # Save the HTML report
-    with open(html_file_path, 'w', encoding='utf-8') as html_file:
-        html_file.write(str(html))
-
-# Generate the reports
-generate_sarif_html_and_csv('result.sarif', 'sarif_viewer_style_report.html', 'sarif_report.csv')
-"
+          generate_sarif_html_and_csv("result.sarif", "report.html", "report.csv")
+          EOF
+          
+          python generate_reports.py
 
       - name: Upload results
         if: failure() && steps.scan.outcome == 'failure'
@@ -216,5 +136,5 @@ generate_sarif_html_and_csv('result.sarif', 'sarif_viewer_style_report.html', 's
           name: semgrep-results
           path: |
             result.sarif
-            sarif_viewer_style_report.html
-            sarif_report.csv
+            report.html
+            report.csv
