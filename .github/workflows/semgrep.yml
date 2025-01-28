@@ -25,13 +25,15 @@ jobs:
         continue-on-error: true  # Continue even if findings exist
         run: semgrep ci --config=auto --sarif -o result.sarif
 
-      - name: Set up Python inside the container
+      - name: Set up Python virtual environment
         run: |
-          apk add --no-cache python3 py3-pip
-          pip3 install beautifulsoup4
+          python3 -m venv /opt/venv
+          source /opt/venv/bin/activate
+          pip install beautifulsoup4
 
       - name: Generate reports
         run: |
+          source /opt/venv/bin/activate
           cat << 'EOF' > generate_reports.py
           import json
           import csv
