@@ -1,37 +1,30 @@
-name: Semgrep Security Scan
-
+name: Semgrep
 on:
+  pull_request: {}
   push:
-    branches: [ "*" ]
-  pull_request:
-    branches: [ "master" ]
+    branches:
+      - "*"
+    paths:
+      - .github/workflows/semgrep.yml
   schedule:
-    - cron: '22 1 * * 5'
-
-permissions:
-  contents: read
-
+    - cron: '0 0 * * 0'
+  workflow_dispatch: {}
 jobs:
   semgrep:
-    permissions:
-      contents: read
-      security-events: write
-    name: Semgrep Scan
-    runs-on: ubuntu-latest
+    name: Scan
+    runs-on: ubuntu-20.04
+    env:
+      SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+    container:
+      image: returntocorp/semgrep
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Semgrep
-        uses: returntocorp/semgrep-action@fcd5ab7459e8d91cb1777481980d1b18b4fc6735
+      - uses: actions/checkout@v3
+      - name: Semgrep scan
+        id: scan
+        run: semgrep ci --config=auto --sarif -o result.sarif
+      - name: Upload results
+        if: failure() && steps.scan.outcome == 'failure'
+        uses: actions/upload-artifact@v3
         with:
-          config: "p/ci"  # Required security rules
-          publishToken: ${{ secrets.SEMGREP_APP_TOKEN }}
-          generateSarif: "1"
-          args: --error  # Fail the build if findings are found
-
-      - name: Upload SARIF results
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: semgrep.sarif
-        if: always()
+          name: result.sarif
+          path: result.sarif
